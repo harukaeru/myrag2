@@ -1,0 +1,13 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: main.py",  // デバッグ構成の名前
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/main.py", // 実行するPythonスクリプト
+            "console": "integratedTerminal", // 統合ターミナルで実行
+            "args": [] // 必要に応じてコマンドライン引数を指定
+        }
+    ]
+}
