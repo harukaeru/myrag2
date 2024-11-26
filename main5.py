@@ -1,11 +1,12 @@
+from typing import List, Any
 from langchain_core.documents import Document
-from typing import List
 from langchain_community.document_loaders import GitLoader, DirectoryLoader
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.output_parsers import StrOutputParser
+from langchain_cohere import CohereRerank
 import dotenv
 import os
 
@@ -28,18 +29,18 @@ def file_filter(file_path) -> bool:
 # documents = loader.load()
 # print(len(documents))
 
-def reciprocal_rank_fusion(retriever_outputs: List[List[Document]], k: int = 60) -> List[str]:
-    content_score_mapping = {}
-    for docs in retriever_outputs:
-        for rank, doc in enumerate(docs):
-            content = doc.page_content
-
-            if content not in content_score_mapping:
-                content_score_mapping[content] = 0
-
-            content_score_mapping[content] += 1 / (rank + 1)
-    ranked = sorted(content_score_mapping.items(), key=lambda x: x[1], reverse=True)
-    return [content for content, _ in ranked[:k]]
+# def reciprocal_rank_fusion(retriever_outputs: List[List[Document]], k: int = 60) -> List[str]:
+#     content_score_mapping = {}
+#     for docs in retriever_outputs:
+#         for rank, doc in enumerate(docs):
+#             content = doc.page_content
+# 
+#             if content not in content_score_mapping:
+#                 content_score_mapping[content] = 0
+# 
+#             content_score_mapping[content] += 1 / (rank + 1)
+#     ranked = sorted(content_score_mapping.items(), key=lambda x: x[1], reverse=True)
+#     return [content for content, _ in ranked[:k]]
 
 embeddings = OpenAIEmbeddings(model='text-embedding-3-small')
 # db = Chroma.from_documents(documents, embeddings, persist_directory='./chroma_db')
@@ -85,10 +86,18 @@ prompt = ChatPromptTemplate.from_template('''\
 llm = ChatOpenAI(model='gpt-4o-mini')
 
 query_generation_chain = query_generation_prompt | llm.with_structured_output(QueryGenerationOutput) | (lambda x: x.queries)
+
+def rerank(inp: dict[str, Any], top_n: int = 3) -> List[Document]:
+    question = inp['question']
+    documents = inp['documents']
+
+    cohere_reranker = CohereRerank(model='rerank-multilingual-v3.0', top_n=top_n)
+    reranked = cohere_reranker.compress_documents(documents=documents, query=question)
+    return reranked
 # hyde_chain = hyde_prompt | llm | StrOutputParser()
 
 chain = (
-  {"context": query_generation_chain | retriever.map() | reciprocal_rank_fusion, "question": RunnablePassthrough()} | prompt | llm | StrOutputParser()
+  {"documents":  retriever, "question": RunnablePassthrough()} | RunnablePassthrough.assign(context=rerank) | prompt | llm | StrOutputParser()
 )
 
 out = chain.invoke('langchainの概要を教えてください')
