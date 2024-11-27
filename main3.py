@@ -6,24 +6,35 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_core.output_parsers import StrOutputParser
 import dotenv
 import os
+import chromadb
 
 dotenv.load_dotenv('./.env')
 
 def file_filter(file_path) -> bool:
     return file_path.endswith('.mdx')
 
-loader = GitLoader(
-    clone_url='https://github.com/langchain-ai/langchain',
-    repo_path='./langchain',
-    branch='master',
-    file_filter=file_filter
-)
+# clone_url = 'https://github.com/langchain-ai/langchain'
 
-documents = loader.load()
-print(len(documents))
+# if os.path.exists('langchain'):
+#   clone_url = None
+# 
+# loader = GitLoader(
+#     clone_url=clone_url,
+#     repo_path='./langchain',
+#     branch='master',
+#     file_filter=file_filter
+# )
+# 
+# documents = loader.load()
+# print(len(documents))
 
 embeddings = OpenAIEmbeddings(model='text-embedding-3-small')
-db = Chroma.from_documents(documents, embeddings)
+client = chromadb.PersistentClient(path='./chroma_db')
+db = Chroma(
+  collection_name='langchain',
+  embedding_function=embeddings,
+  client=client
+)
 
 retriever = db.as_retriever()
 

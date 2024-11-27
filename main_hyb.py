@@ -56,6 +56,11 @@ chroma_retriever.with_config({"run_name": "langchain_document_retriever"})
 
 bm25_retriever = BM25Retriever.from_documents(documents).with_config({"run_name": "bm25_retriever"})
 
+hybrid_retriever = {
+  "chroma_documents": chroma_retriever,
+  "bm25_documents": bm25_retriever
+}
+
 
 class Route(str, Enum):
     langchain_document = 'langchain_document'
